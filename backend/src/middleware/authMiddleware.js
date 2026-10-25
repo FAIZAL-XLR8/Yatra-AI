@@ -29,3 +29,4 @@ export async function protect(req, res, next) {
     return res.status(401).json({ message: "Not authorized, invalid or expired token" });
   }
 }
+

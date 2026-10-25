@@ -95,3 +95,15 @@ export function logout(req, res) {
     res.status(500).json({ message: error.message });
   }
 }
+
+// @desc    Get current user profile (session check)
+// @route   GET /api/auth/me
+// @access  Private (protected by authMiddleware)
+export function getMe(req, res) {
+  try {
+    res.status(200).json(req.user);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+}
+
