@@ -4,6 +4,7 @@ import cookieParser from "cookie-parser";
 import { config } from "./src/config/env.js";
 import { connectDB } from "./src/config/db.js";
 import authRoutes from "./src/routes/authRoutes.js";
+import tripRoutes from "./src/routes/tripRoutes.js";
 
 const app = express();
 
@@ -17,6 +18,7 @@ app.use(cookieParser()); // Parses incoming cookies in req.cookies
 
 // Mount API Routes
 app.use("/api/auth", authRoutes);
+app.use("/api/trips", tripRoutes);
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {
