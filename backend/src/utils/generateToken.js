@@ -1,12 +1,5 @@
 import jwt from "jsonwebtoken";
 import { config } from "../config/env.js";
-
-/**
- * Generates a signed JWT and attaches it to an HTTP-only cookie on the response.
- * @param {import('express').Response} res - Express response object
- * @param {string} userId - MongoDB User _id string
- * @returns {string} The signed JWT
- */
 export function generateTokenAndSetCookie(res, userId) {
   const token = jwt.sign({ id: userId }, config.jwtSecret, {
     expiresIn: "30d"
