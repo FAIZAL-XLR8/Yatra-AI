@@ -3,7 +3,9 @@ import {
   createTripRequest,
   getTripById,
   searchTripTransport,
-  selectTripTransport
+  selectTripTransport,
+  searchTripHotels,
+  selectTripHotel
 } from "../controllers/tripController.js";
 import { protect } from "../middleware/authMiddleware.js";
 
@@ -17,5 +19,11 @@ router.post("/:tripId/transport/search", protect, searchTripTransport);
 
 // Phase 2: HITL Transport Selection Gate
 router.post("/:tripId/transport/select", protect, selectTripTransport);
+
+// Phase 3A: Hotel Discovery (City-wide or Landmark Radius)
+router.post("/:tripId/hotels/search", protect, searchTripHotels);
+
+// Phase 4: HITL Hotel Selection Gate
+router.post("/:tripId/hotels/select", protect, selectTripHotel);
 
 export default router;

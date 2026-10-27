@@ -86,7 +86,6 @@ export function resolveStationCode(cityOrCode) {
     return CITY_TO_STATION[normalized];
   }
 
-  // Check prefix or partial match (e.g. "jaipur city" -> "jaipur")
   for (const [city, code] of Object.entries(CITY_TO_STATION)) {
     if (normalized.startsWith(`${city} `) || normalized.endsWith(` ${city}`)) {
       return code;
@@ -97,8 +96,8 @@ export function resolveStationCode(cityOrCode) {
 }
 
 /**
- * Searches live Indian Railways trains between origin and destination stations.
- * Normalizes up to 10 trains into the standardized Yatra AI schema.
+ * Searches Indian Railways live trains between origin and destination stations.
+ * Strictly uses live API data when RAPIDAPI_KEY is configured. Returns empty array otherwise.
  *
  * @param {Object} params
  * @param {string} params.origin - Origin city or station code.
@@ -127,7 +126,7 @@ export async function searchTrains({ origin, destination, departureDate, passeng
 
   if (!rapidApiKey) {
     console.warn(
-      "[TrainService] RAPIDAPI_KEY is missing in .env. Live train search will return empty."
+      "[TrainService] RAPIDAPI_KEY is not configured in .env. Live train search will return empty."
     );
     return [];
   }
@@ -148,54 +147,59 @@ export async function searchTrains({ origin, destination, departureDate, passeng
     });
 
     const rawTrains = response.data?.data || [];
-    if (!Array.isArray(rawTrains)) return [];
-
-    const normalizedTrains = [];
-
-    for (const train of rawTrains) {
-      if (normalizedTrains.length >= 10) break;
-
-      const trainNumber = train.train_number ? String(train.train_number).trim() : null;
-      const trainName = train.train_name ? String(train.train_name).trim() : null;
-
-      // Discard malformed records missing primary identifiers
-      if (!trainNumber || !trainName) continue;
-
-      const departureTime = train.from_std
-        ? `${departureDate}T${train.from_std}:00`
-        : null;
-      const arrivalTime = train.to_std
-        ? `${departureDate}T${train.to_std}:00`
-        : null;
-
-      const availableClasses = Array.isArray(train.class_type) ? train.class_type : [];
-      const duration = train.duration ? String(train.duration) : null;
-      const priceInr = Number(train.fare) > 0 ? Math.round(Number(train.fare)) : null;
-
-      normalizedTrains.push({
-        id: trainNumber,
-        type: "TRAIN",
-        providerReference: "IRCTC",
-        operatorName: "INDIAN_RAILWAYS",
-        identifier: `${trainNumber}-${trainName.replace(/\s+/g, "_").toUpperCase()}`,
-        trainName,
-        trainNumber,
-        origin: originStation,
-        destination: destStation,
-        departureTime,
-        arrivalTime,
-        duration,
-        availableClasses,
-        priceInr
-      });
+    if (!Array.isArray(rawTrains) || rawTrains.length === 0) {
+      return [];
     }
 
-    return normalizedTrains;
+    return normalizeApiTrains(rawTrains, originStation, destStation, departureDate);
   } catch (error) {
     console.error(
-      `[TrainService] Train search failed for ${originStation}->${destStation} on ${departureDate}:`,
+      `[TrainService] Live train search failed for ${originStation}->${destStation}:`,
       error.response?.data?.message || error.message
     );
     return [];
   }
+}
+
+function normalizeApiTrains(rawTrains, originStation, destStation, departureDate) {
+  const normalizedTrains = [];
+
+  for (const train of rawTrains) {
+    if (normalizedTrains.length >= 10) break;
+
+    const trainNumber = train.train_number ? String(train.train_number).trim() : null;
+    const trainName = train.train_name ? String(train.train_name).trim() : null;
+
+    if (!trainNumber || !trainName) continue;
+
+    const departureTime = train.from_std
+      ? `${departureDate}T${train.from_std}:00`
+      : null;
+    const arrivalTime = train.to_std
+      ? `${departureDate}T${train.to_std}:00`
+      : null;
+
+    const availableClasses = Array.isArray(train.class_type) ? train.class_type : [];
+    const duration = train.duration ? String(train.duration) : null;
+    const priceInr = Number(train.fare) > 0 ? Math.round(Number(train.fare)) : null;
+
+    normalizedTrains.push({
+      id: trainNumber,
+      type: "TRAIN",
+      providerReference: "IRCTC",
+      operatorName: "INDIAN_RAILWAYS",
+      identifier: `${trainNumber}-${trainName.replace(/\s+/g, "_").toUpperCase()}`,
+      trainName,
+      trainNumber,
+      origin: originStation,
+      destination: destStation,
+      departureTime,
+      arrivalTime,
+      duration,
+      availableClasses,
+      priceInr
+    });
+  }
+
+  return normalizedTrains;
 }
