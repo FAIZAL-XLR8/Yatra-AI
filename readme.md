@@ -97,7 +97,7 @@ Add each variable to `.env.example` only in the step that first needs it. Never 
 
 ## Git workflow
 
-- Each person works on their own branch (mine: `anmol-dev`). Never commit directly to `main`.
+- Each person works on their own branch (mine: `grim`). Never commit directly to `main`.
 - Before each new step: `git pull origin main`, then merge into your branch if Faizal pushed.
 - Commit after every finished step, small and focused, e.g. `feat(backend): add health check route`.
 - Open a pull request to `main` after each completed phase.
@@ -109,7 +109,7 @@ Add each variable to `.env.example` only in the step that first needs it. Never 
 Each step should take about 15-40 minutes and touch 1-3 files. Finish and verify one step before starting the next.
 
 ### Phase 0 - Foundation
-- [ ] 0.1 Check repo state and branch (`anmol-dev`)
+- [ ] 0.1 Check repo state and branch (`grim`)
 - [ ] 0.2 Write the `.gitignore` (node_modules, .env, build output)
 - [ ] 0.3 Create `.env.example` (empty for now) and this README skeleton
 - [ ] 0.4 Understand the `backend/` and `frontend/` layout
