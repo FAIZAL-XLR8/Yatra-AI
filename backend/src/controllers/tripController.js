@@ -166,6 +166,39 @@ export async function selectTripTransport(req, res) {
       return res.status(404).json({ message: "Trip not found." });
     }
 
+    let finalPriceInr = Math.round(Number(priceInr));
+    let fareClass = req.body.fareClass || req.body.selectedClass || null;
+    let fareBreakdown = [];
+    let isLiveFare = false;
+
+    // Phase 2: On train selection, hit live API for exact 100% IRCTC ticket price
+    if (type.toUpperCase() === "TRAIN") {
+      const trainNumber = req.body.trainNumber || (identifier.match(/^(\d+)/) ? identifier.match(/^(\d+)/)[1] : null);
+      const matchedTrain = Array.isArray(trip.trainResults)
+        ? trip.trainResults.find(t => t.id === trainNumber || t.identifier === identifier)
+        : null;
+
+      const originStation = req.body.fromStation || matchedTrain?.origin;
+      const destStation = req.body.toStation || matchedTrain?.destination;
+
+      if (trainNumber && originStation && destStation) {
+        const { getLiveTrainFare } = await import("../services/trainService.js");
+        const liveResult = await getLiveTrainFare({
+          trainNo: trainNumber,
+          fromStationCode: originStation,
+          toStationCode: destStation,
+          preferredClass: fareClass
+        });
+
+        if (liveResult.liveFare) {
+          finalPriceInr = liveResult.liveFare;
+          fareClass = liveResult.matchedClass;
+          fareBreakdown = liveResult.fareBreakdown;
+          isLiveFare = true;
+        }
+      }
+    }
+
     trip.selectedTransport = {
       type: type.toUpperCase(),
       providerReference: providerReference || (type.toUpperCase() === "FLIGHT" ? "AMADEUS" : "IRCTC"),
@@ -174,7 +207,10 @@ export async function selectTripTransport(req, res) {
       departureTime: departureTime || null,
       arrivalTime: arrivalTime || null,
       duration: duration || null,
-      priceInr: Math.round(Number(priceInr)),
+      priceInr: finalPriceInr,
+      fareClass: fareClass || null,
+      isLiveFare,
+      fareBreakdown,
       selectedAt: new Date()
     };
 
@@ -300,6 +336,96 @@ export async function selectTripHotel(req, res) {
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+}
+
+// @desc    Phase 5A: Review checkout invoice (transport + stay total)
+// @route   GET /api/trips/:tripId/review
+// @access  Private
+export async function getTripReview(req, res) {
+  try {
+    const { tripId } = req.params;
+
+    const trip = await Trip.findOne({
+      _id: tripId,
+      userId: req.user._id
+    });
+
+    if (!trip) {
+      return res.status(404).json({ message: "Trip not found." });
+    }
+
+    const { calculateTripInvoice } = await import("../services/paymentService.js");
+    const invoice = calculateTripInvoice(trip);
+
+    res.status(200).json({
+      message: "Trip checkout review retrieved successfully.",
+      tripId: trip._id,
+      workflowStatus: trip.workflowStatus,
+      paymentStatus: trip.paymentStatus,
+      bookingStatus: trip.bookingStatus,
+      invoice
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+}
+
+// @desc    Phase 5B: Create Razorpay payment order for trip
+// @route   POST /api/trips/:tripId/payment/order
+// @access  Private
+export async function createTripPaymentOrder(req, res) {
+  try {
+    const { tripId } = req.params;
+
+    const { createRazorpayOrder } = await import("../services/paymentService.js");
+    const orderData = await createRazorpayOrder({
+      tripId,
+      userId: req.user._id
+    });
+
+    res.status(200).json({
+      message: "Razorpay payment order created successfully.",
+      ...orderData
+    });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+}
+
+// @desc    Phase 5C: Verify Razorpay cryptographic signature and confirm booking
+// @route   POST /api/trips/:tripId/payment/verify
+// @access  Private
+export async function verifyTripPayment(req, res) {
+  try {
+    const { tripId } = req.params;
+    const {
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature
+    } = req.body;
+
+    if (!razorpay_order_id || !razorpay_payment_id) {
+      return res.status(400).json({
+        message: "razorpay_order_id and razorpay_payment_id are required."
+      });
+    }
+
+    const { verifyRazorpayPayment } = await import("../services/paymentService.js");
+    const confirmation = await verifyRazorpayPayment({
+      tripId,
+      userId: req.user._id,
+      razorpayOrderId: razorpay_order_id,
+      razorpayPaymentId: razorpay_payment_id,
+      razorpaySignature: razorpay_signature
+    });
+
+    res.status(200).json({
+      message: "Payment verified successfully. Booking is now confirmed!",
+      ...confirmation
+    });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
   }
 }
 

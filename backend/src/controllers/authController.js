@@ -40,7 +40,6 @@ export async function register(req, res) {
       _id: user._id,
       name: user.name,
       email: user.email,
-      walletBalance: user.walletBalance,
       preferences: user.preferences
     });
   } catch (error) {
@@ -74,7 +73,6 @@ export async function login(req, res) {
       _id: user._id,
       name: user.name,
       email: user.email,
-      walletBalance: user.walletBalance,
       preferences: user.preferences
     });
   } catch (error) {
