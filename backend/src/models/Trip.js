@@ -64,6 +64,9 @@ const tripSchema = new mongoose.Schema(
       arrivalTime: String,
       duration: String,
       priceInr: Number,
+      fareClass: String,
+      isLiveFare: Boolean,
+      fareBreakdown: { type: Array, default: [] },
       selectedAt: Date
     },
 
