@@ -314,6 +314,20 @@ export async function selectTripHotel(req, res) {
       return res.status(404).json({ message: "Trip not found." });
     }
 
+    // Extract or find coordinates from hotel search results
+    let lat = req.body.geoCode?.latitude || req.body.latitude || null;
+    let lon = req.body.geoCode?.longitude || req.body.longitude || null;
+
+    if ((!lat || !lon) && Array.isArray(trip.hotelResults)) {
+      const matched = trip.hotelResults.find(
+        (h) => h.hotelId === String(hotelId) || h.name?.toLowerCase() === String(name).toLowerCase()
+      );
+      if (matched?.geoCode?.latitude && matched?.geoCode?.longitude) {
+        lat = matched.geoCode.latitude;
+        lon = matched.geoCode.longitude;
+      }
+    }
+
     trip.selectedHotel = {
       hotelId: String(hotelId),
       name: String(name),
@@ -322,6 +336,7 @@ export async function selectTripHotel(req, res) {
       pricePerNightInr: pricePerNightInr ? Math.round(Number(pricePerNightInr)) : null,
       totalPriceInr: totalPriceInr ? Math.round(Number(totalPriceInr)) : null,
       nights: Number(nights) || 1,
+      geoCode: lat && lon ? { latitude: Number(lat), longitude: Number(lon) } : null,
       selectedAt: new Date()
     };
 
@@ -420,6 +435,23 @@ export async function verifyTripPayment(req, res) {
       razorpaySignature: razorpay_signature
     });
 
+    // Phase 6: Auto-trigger background linking of confirmed hotel to Neo4j attraction graph
+    const trip = await Trip.findById(tripId);
+    if (trip?.selectedHotel?.name && trip?.tripSpec?.destination) {
+      import("../services/hotelGraphService.js").then(({ linkHotelToAttractionGraph }) => {
+        linkHotelToAttractionGraph({
+          tripId: trip._id,
+          destinationCity: trip.tripSpec.destination,
+          hotelId: trip.selectedHotel.hotelId,
+          hotelName: trip.selectedHotel.name,
+          latitude: trip.selectedHotel.geoCode?.latitude,
+          longitude: trip.selectedHotel.geoCode?.longitude
+        }).catch((err) =>
+          console.warn("[TripController] Background hotel graph link warning:", err.message)
+        );
+      });
+    }
+
     res.status(200).json({
       message: "Payment verified successfully. Booking is now confirmed!",
       ...confirmation
@@ -428,4 +460,111 @@ export async function verifyTripPayment(req, res) {
     res.status(400).json({ message: error.message });
   }
 }
+
+// @desc    Phase 6: Link confirmed hotel to Neo4j destination attraction graph
+// @route   POST /api/trips/:tripId/hotel-graph/link
+// @access  Private
+export async function linkTripHotelGraph(req, res) {
+  try {
+    const { tripId } = req.params;
+
+    const trip = await Trip.findOne({
+      _id: tripId,
+      userId: req.user._id
+    });
+
+    if (!trip) {
+      return res.status(404).json({ message: "Trip not found." });
+    }
+
+    if (!trip.selectedHotel?.name) {
+      return res.status(400).json({
+        message: "No confirmed hotel selected on this trip yet."
+      });
+    }
+
+    const { linkHotelToAttractionGraph } = await import("../services/hotelGraphService.js");
+    const result = await linkHotelToAttractionGraph({
+      tripId: trip._id,
+      destinationCity: trip.tripSpec.destination,
+      hotelId: trip.selectedHotel.hotelId,
+      hotelName: trip.selectedHotel.name,
+      latitude: trip.selectedHotel.geoCode?.latitude,
+      longitude: trip.selectedHotel.geoCode?.longitude
+    });
+
+    res.status(200).json({
+      message: "Hotel successfully linked to Neo4j attraction graph.",
+      tripId: trip._id,
+      workflowStatus: "HOTEL_GRAPH_LINKED",
+      ...result
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+}
+
+// @desc    Phase 7: Optimize daily zero zig-zag itinerary with Neo4j and live OSRM road distances
+// @route   POST /api/trips/:tripId/itinerary/optimize
+// @access  Private
+// Body (optional): { mode: "nearest"|"within"|"all", n: 6, km: 10 }
+//   mode="nearest" → N closest attractions to hotel (Neo4j graph query)
+//   mode="within"  → all attractions within km of hotel (Neo4j graph query)
+//   mode="all"     → all city attractions, no hotel filter (default)
+export async function optimizeTripItineraryController(req, res) {
+  try {
+    const { tripId } = req.params;
+    const { mode = "all", n = 6, km = 10 } = req.body;
+
+    const { optimizeTripItinerary } = await import("../services/optimizerService.js");
+    const itinerary = await optimizeTripItinerary({
+      tripId,
+      userId: req.user._id,
+      mode,
+      n: Number(n),
+      km: Number(km)
+    });
+
+    res.status(200).json({
+      message: `Itinerary optimized (mode: ${mode}).`,
+      tripId,
+      workflowStatus: "ITINERARY_FINALIZED",
+      itinerary
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+}
+
+// @desc    Retrieve saved finalized itinerary
+// @route   GET /api/trips/:tripId/itinerary
+// @access  Private
+export async function getTripItinerary(req, res) {
+  try {
+    const { tripId } = req.params;
+
+    const trip = await Trip.findOne({
+      _id: tripId,
+      userId: req.user._id
+    });
+
+    if (!trip) {
+      return res.status(404).json({ message: "Trip not found." });
+    }
+
+    if (!trip.itinerary) {
+      return res.status(404).json({ message: "Itinerary has not been generated yet for this trip." });
+    }
+
+    res.status(200).json({
+      tripId: trip._id,
+      destination: trip.tripSpec.destination,
+      workflowStatus: trip.workflowStatus,
+      itinerary: trip.itinerary
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+}
+
 
