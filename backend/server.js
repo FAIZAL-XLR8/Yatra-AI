@@ -19,6 +19,7 @@ app.use(cookieParser()); // Parses incoming cookies in req.cookies
 // Mount API Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/trips", tripRoutes);
+app.use("/api/trip", tripRoutes);
 
 // Health check endpoint
 app.get("/api/health", (req, res) => {
