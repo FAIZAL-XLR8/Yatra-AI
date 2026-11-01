@@ -269,6 +269,7 @@ export async function buildAttractionKnowledgeGraph(destinationCity) {
     await session.run(upsertNodesCypher, { attractions });
 
     // Upsert pairwise [:CAB_ROUTE] edges
+
     const upsertEdgesCypher = `
       UNWIND $routes AS r
       MATCH (from:Attraction { id: r.fromId })
@@ -278,6 +279,7 @@ export async function buildAttractionKnowledgeGraph(destinationCity) {
           rel.durationMins = r.durationMins,
           rel.cabFareInr = r.cabFareInr
     `;
+
     await session.run(upsertEdgesCypher, { routes });
 
     // 5. Update MongoDB Registry: Mark graph as saved

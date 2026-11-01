@@ -243,3 +243,4 @@ Tips:
 - Replace any claim you cannot demo or measure. Interviewers will ask.
 - Verify model names (`Llama 3.3 70B`, `text-embedding-004`) in current docs; they may be renamed or retired.
 - Add the real GitHub and demo links only after deployment.
+
