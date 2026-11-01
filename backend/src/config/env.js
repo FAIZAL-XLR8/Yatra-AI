@@ -15,5 +15,6 @@ export const config = {
   neo4jUser: process.env.NEO4J_USER || "neo4j",
   neo4jPassword: process.env.NEO4J_PASSWORD || "",
   razorpayKeyId: process.env.RAZORPAY_KEY_ID || "",
-  razorpayKeySecret: process.env.RAZORPAY_KEY_SECRET || ""
+  razorpayKeySecret: process.env.RAZORPAY_KEY_SECRET || "",
+  groqApiKey: process.env.GROQ_API_KEY || ""
 };

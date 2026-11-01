@@ -46,6 +46,7 @@ const tripSchema = new mongoose.Schema(
         "HOTEL_SELECTED",
         "PAYMENT_PENDING",
         "BOOKING_CONFIRMED",
+        "HOTEL_GRAPH_LINKED",
         "ITINERARY_FINALIZED",
         "FAILED"
       ],
@@ -84,6 +85,10 @@ const tripSchema = new mongoose.Schema(
       pricePerNightInr: Number,
       totalPriceInr: Number,
       nights: Number,
+      geoCode: {
+        latitude: Number,
+        longitude: Number
+      },
       selectedAt: Date
     },
 
