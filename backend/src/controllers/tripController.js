@@ -438,8 +438,8 @@ export async function verifyTripPayment(req, res) {
     // Phase 6: Auto-trigger background linking of confirmed hotel to Neo4j attraction graph
     const trip = await Trip.findById(tripId);
     if (trip?.selectedHotel?.name && trip?.tripSpec?.destination) {
-      import("../services/hotelGraphService.js").then(({ linkHotelToAttractionGraph }) => {
-        linkHotelToAttractionGraph({
+      import("../services/hotelGraphService.js").then(({ linkHotelToAttractions }) => {
+        linkHotelToAttractions({
           tripId: trip._id,
           destinationCity: trip.tripSpec.destination,
           hotelId: trip.selectedHotel.hotelId,
@@ -483,8 +483,8 @@ export async function linkTripHotelGraph(req, res) {
       });
     }
 
-    const { linkHotelToAttractionGraph } = await import("../services/hotelGraphService.js");
-    const result = await linkHotelToAttractionGraph({
+    const { linkHotelToAttractions } = await import("../services/hotelGraphService.js");
+    const result = await linkHotelToAttractions({
       tripId: trip._id,
       destinationCity: trip.tripSpec.destination,
       hotelId: trip.selectedHotel.hotelId,
